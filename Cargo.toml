@@ -1,0 +1,27 @@
+[package]
+name          = "ai-duel"
+version       = "0.1.0"
+edition       = "2024"
+authors       = ["Jorge Andre Castro <georgeandrec@gmail.com>"]
+license       = "GPL-2.0-or-later"
+description   = "Plugin d'IA de duel (approche + attaque + dégâts) pour Bevy."
+repository    = "https://github.com/jorgeandrecastro/ai-duel"
+documentation = "https://docs.rs/ai-duel"
+readme        = "README.md"
+keywords      = ["bevy", "ai", "game", "combat", "duel"]
+categories    = ["game-development"]
+
+
+
+[lib]
+name = "ai_duel"
+path = "src/lib.rs"
+
+[dependencies]
+bevy = "0.19"
+
+[profile.release]
+opt-level     = 3
+lto           = true
+codegen-units = 1
+strip         = true
