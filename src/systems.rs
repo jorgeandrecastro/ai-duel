@@ -1,34 +1,32 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026 Jorge Andre Castro <georgeandrec@gmail.com>
 
-//! Les systèmes ajoutés par [`AiDuelPlugin`](crate::AiDuelPlugin).
+//! The systems added by [`AiDuelPlugin`](crate::AiDuelPlugin).
 //!
-//! Ils sont publics pour que vous puissiez les ré-ordonnancer ou les
-//! remplacer dans votre `App`, mais dans la plupart des cas vous n'aurez
-//! rien à y toucher.
+//! They are public so you can reorder or replace them in your `App`, but in
+//! most cases you will not need to change them.
 
 use bevy::prelude::*;
 
 use crate::components::*;
 use crate::start_attack;
 
-/// Test de recouvrement entre deux AABB définies par leur centre et leur
-/// demi-taille.
+/// Tests overlap between two AABBs defined by their centers and half-sizes.
 pub fn aabb_overlap(center_a: Vec2, half_a: Vec2, center_b: Vec2, half_b: Vec2) -> bool {
     (center_a.x - center_b.x).abs() < half_a.x + half_b.x
         && (center_a.y - center_b.y).abs() < half_a.y + half_b.y
 }
 
-/// Fait descendre les cooldowns d'attaque à chaque frame.
+/// Decreases attack cooldowns each frame.
 pub fn tick_cooldowns(time: Res<Time>, mut q: Query<&mut AttackCooldown>) {
     for mut cd in &mut q {
         cd.0 = (cd.0 - time.delta_secs()).max(0.0);
     }
 }
 
-/// Le cerveau de l'IA : fonce sur le joueur, s'arrête à `stop_range` et
-/// attaque dès qu'elle passe sous `aggression_range` (si le cooldown le
-/// permet). Sans joueur sur la carte, l'IA ne fait rien.
+/// The AI's brain: rushes toward the player, stops at `stop_range`, and
+/// attacks below `aggression_range` (if the cooldown allows it).
+/// Without a player on the map, the AI does nothing.
 pub fn ai_behavior(
     time: Res<Time>,
     assets: Res<FighterAssets>,
@@ -53,7 +51,7 @@ pub fn ai_behavior(
     let player_pos = player_tf.translation.truncate();
 
     for (mut tf, mut state, mut anim, mut sprite, mut wants, mut cd, ai) in &mut ai_q {
-        // Pas de déplacement pendant l'animation d'attaque.
+        // No movement during the attack animation.
         if state.0 == FighterState::Attacking {
             wants.0 = false;
             continue;
@@ -63,8 +61,8 @@ pub fn ai_behavior(
         let dist = to_player.length();
         let dir = to_player.normalize_or_zero();
 
-        // Toujours se tourner vers la cible, y compris à l'arrêt ou avant
-        // une attaque (sinon la hitbox partirait du mauvais côté).
+        // Always face the target, even when stopped or before an attack
+        // (otherwise the hitbox would appear on the wrong side).
         if dir.x.abs() > 0.1 {
             tf.scale.x = config.sprite_scale * dir.x.signum();
         }
@@ -87,8 +85,8 @@ pub fn ai_behavior(
     }
 }
 
-/// Avance les timers d'animation et change de frame quand il le faut. Gère
-/// aussi le retour à l'état « course » une fois l'attaque terminée.
+/// Advances animation timers and changes frames when needed. Also returns to
+/// the running state once the attack is finished.
 pub fn animate_fighters(
     time: Res<Time>,
     assets: Res<FighterAssets>,
@@ -109,7 +107,7 @@ pub fn animate_fighters(
 
         if state.0 == FighterState::Attacking {
             if anim.frame_index >= anim.max_frames {
-                // Attaque terminée : retour à la course.
+                // Attack finished: return to running.
                 state.0 = FighterState::Running;
                 anim.frame_index = 0;
                 anim.max_frames = config.run_frames.max(1);
@@ -129,12 +127,12 @@ pub fn animate_fighters(
                 atlas.index = anim.frame_index;
             }
         }
-        // Combattant immobile : on garde la frame actuelle (pas d'idle).
+        // Stationary fighter: keep the current frame (no idle animation).
     }
 }
 
-/// Active la hitbox uniquement sur la fenêtre de frames définie dans la
-/// config, pour que le coup ne touche pas dès le début de l'animation.
+/// Activates the hitbox only during the frame window defined in the config,
+/// so the attack does not hit at the start of the animation.
 pub fn update_hitboxes(
     config: Res<AiDuelConfig>,
     mut hitbox_q: Query<&mut Hitbox>,
@@ -149,11 +147,11 @@ pub fn update_hitboxes(
     }
 }
 
-/// Collision AABB contre AABB : pour chaque hitbox active, applique les
-/// dégâts aux combattants de faction adverse dont la hurtbox la recouvre.
+/// AABB vs. AABB collision: for each active hitbox, applies damage to
+/// opposing fighters whose hurtboxes overlap it.
 ///
-/// Complexité O(hitbox actives × combattants) : largement suffisant pour un
-/// duel ou quelques ennemis, pas pensé pour une horde.
+/// Complexity O(active hitboxes × fighters): more than enough for a duel or
+/// a few enemies, but not designed for a horde.
 pub fn resolve_hits(
     config: Res<AiDuelConfig>,
     hitbox_q: Query<(&Hitbox, &GlobalTransform)>,
@@ -167,20 +165,20 @@ pub fn resolve_hits(
 
         for (tf, faction, hurtbox, mut hp) in &mut target_q {
             if *faction == hb.faction {
-                continue; // pas de dégâts alliés
+                continue; // no friendly damage
             }
             let target = tf.translation().truncate();
             if aabb_overlap(center, hb.half_size, target, hurtbox.half_size)
                 && hp.try_hit(hb.damage, config.hit_cooldown)
             {
-                debug!("Touché ! PV restants : {:.0}/{:.0}", hp.current, hp.max);
+                debug!("Hit! Health remaining: {:.0}/{:.0}", hp.current, hp.max);
             }
         }
     }
 }
 
-/// Décompte l'invulnérabilité après un coup et teinte le sprite en rouge
-/// pendant ce temps, pour rendre le coup visible à l'écran.
+/// Counts down invulnerability after a hit and tints the sprite red during
+/// that time, making the hit visible on screen.
 pub fn tick_health_and_flash(time: Res<Time>, mut q: Query<(&mut Health, &mut Sprite)>) {
     for (mut hp, mut sprite) in &mut q {
         if hp.hit_cooldown > 0.0 {
@@ -192,12 +190,12 @@ pub fn tick_health_and_flash(time: Res<Time>, mut q: Query<(&mut Health, &mut Sp
     }
 }
 
-/// Supprime les combattants à 0 PV (et leur hitbox, enfant de l'entité).
-/// Pas d'animation de mort pour l'instant.
+/// Removes fighters at 0 health (and their hitbox, a child of the entity).
+/// There is no death animation yet.
 pub fn check_death(mut commands: Commands, q: Query<(Entity, &Health)>) {
     for (entity, hp) in &q {
         if hp.is_dead() {
-            debug!("Un combattant est tombé !");
+            debug!("A fighter has fallen!");
             commands.entity(entity).despawn();
         }
     }

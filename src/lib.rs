@@ -1,35 +1,34 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026 Jorge Andre Castro <georgeandrec@gmail.com>
 
-//! Plugin [Bevy](https://bevyengine.org) pour un duel joueur / IA.
+//! A [Bevy](https://bevyengine.org) plugin for player vs. AI duels.
 //!
-//! Deux combattants (ou plus, avec plusieurs ennemis), de la santé, des
-//! factions pour savoir qui peut blesser qui, et une IA simple qui fonce sur
-//! le joueur et attaque dès qu'elle est à portée.
+//! Two fighters (or more, with multiple enemies), health, factions that
+//! determine who can hurt whom, and a simple AI that rushes toward the player
+//! and attacks when in range.
 //!
-//! # Ce que le plugin gère
+//! # What the plugin handles
 //!
-//! - le comportement de l'IA ;
-//! - les animations (course / attaque) ;
-//! - la hitbox d'attaque, les dégâts et l'invulnérabilité après un coup ;
-//! - la mort des combattants.
+//! - AI behavior;
+//! - animations (running / attacking);
+//! - attack hitboxes, damage, and invulnerability after a hit;
+//! - fighter death.
 //!
-//! # Ce qu'il ne gère pas
+//! # What it does not handle
 //!
-//! - le chargement des assets : vous devez construire la ressource
-//!   [`FighterAssets`] ;
-//! - l'input du joueur : appelez [`start_attack`] depuis votre propre système,
-//!   planifié `.before(`[`AiDuelSet`]`)`.
+//! - asset loading: you must construct the [`FighterAssets`] resource;
+//! - player input: call [`start_attack`] from your own system,
+//!   scheduled `.before(`[`AiDuelSet`]`)`.
 //!
-//! # Organisation du code
+//! # Code organization
 //!
-//! | Module         | Contenu                                         |
-//! |----------------|-------------------------------------------------|
-//! | `components`   | configuration, assets, composants               |
-//! | `systems`      | systèmes exécutés par le plugin                 |
-//! | racine (`lib`) | plugin, [`AiDuelSet`], [`spawn_fighter`], [`start_attack`] |
+//! | Module       | Contents                                                   |
+//! |--------------|------------------------------------------------------------|
+//! | `components` | configuration, assets, components                          |
+//! | `systems`    | systems run by the plugin                                  |
+//! | root (`lib`) | plugin, [`AiDuelSet`], [`spawn_fighter`], [`start_attack`] |
 //!
-//! # Exemple minimal
+//! # Minimal example
 //!
 //! ```no_run
 //! use bevy::prelude::*;
@@ -60,11 +59,11 @@
 //!             UVec2::new(96, 80), 6, 1, None, None)),
 //!     };
 //!
-//!     // le joueur, à gauche
+//!     // the player, on the left
 //!     spawn_fighter(&mut commands, &assets, &config,
 //!         Vec3::new(-250.0, 0.0, 0.0), Faction::Player, None);
 //!
-//!     // un ennemi piloté par l'IA, à droite
+//!     // an AI-controlled enemy, on the right
 //!     spawn_fighter(&mut commands, &assets, &config,
 //!         Vec3::new(250.0, 0.0, 0.0), Faction::Enemy,
 //!         Some(AiController::default()));
@@ -83,16 +82,16 @@ pub use components::*;
 
 use bevy::prelude::*;
 
-/// Import pratique : `use ai_duel::prelude::*;`.
+/// Convenient import: `use ai_duel::prelude::*;`.
 pub mod prelude {
     pub use crate::components::*;
     pub use crate::{spawn_fighter, start_attack, AiDuelPlugin, AiDuelSet};
 }
 
-/// Ensemble de systèmes du duel, exécutés dans l'ordre
-/// cooldowns → IA → animation → hitbox → collisions → santé → mort.
+/// Duel systems, executed in order:
+/// cooldowns → AI → animation → hitbox → collisions → health → death.
 ///
-/// Utilisez-le pour ordonner vos propres systèmes par rapport au plugin :
+/// Use this to order your own systems relative to the plugin:
 ///
 /// ```no_run
 /// # use bevy::prelude::*;
@@ -107,11 +106,11 @@ pub mod prelude {
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AiDuelSet;
 
-/// À ajouter après `DefaultPlugins`. Enregistre la configuration par défaut
-/// ([`AiDuelConfig`]) et tous les systèmes du duel.
+/// Add after `DefaultPlugins`. Registers the default configuration
+/// ([`AiDuelConfig`]) and all duel systems.
 ///
-/// Les systèmes sont chaînés (`.chain()`) car chaque étape dépend du résultat
-/// de la précédente.
+/// Systems are chained (`.chain()`) because each step depends on the result
+/// of the previous one.
 pub struct AiDuelPlugin;
 
 impl Plugin for AiDuelPlugin {
@@ -133,11 +132,11 @@ impl Plugin for AiDuelPlugin {
     }
 }
 
-/// Bascule un combattant en attaque : change l'animation et remet le compteur
-/// de frame à zéro. Ne fait rien s'il attaque déjà (une attaque n'est pas
-/// interruptible).
+/// Switches a fighter to attacking: changes the animation and resets the
+/// frame counter. Does nothing if already attacking (attacks cannot be
+/// interrupted).
 ///
-/// À appeler depuis votre système d'input pour piloter le joueur.
+/// Call this from your input system to control the player.
 pub fn start_attack(
     state: &mut CurrentState,
     anim: &mut AnimationTimer,
@@ -160,12 +159,12 @@ pub fn start_attack(
     sprite.image = assets.attack_sheet.clone();
 }
 
-/// Spawne un combattant complet (sprite, vie, hurtbox, cooldown, état...) et
-/// sa hitbox en enfant, inactive au départ.
+/// Spawns a complete fighter (sprite, health, hurtbox, cooldown, state...) and
+/// its initially inactive hitbox as a child.
 ///
-/// Passez `ai = Some(...)` pour un ennemi piloté automatiquement, ou `None`
-/// pour un combattant que vous contrôlez vous-même (typiquement le joueur).
-/// Retourne l'entité du combattant.
+/// Pass `ai = Some(...)` for an automatically controlled enemy, or `None`
+/// for a fighter you control yourself (typically the player).
+/// Returns the fighter entity.
 pub fn spawn_fighter(
     commands: &mut Commands,
     assets: &FighterAssets,
@@ -204,9 +203,9 @@ pub fn spawn_fighter(
     }
     let parent = fighter.id();
 
-    // Le décalage est exprimé en unités monde ; la transformation locale est
-    // divisée par l'échelle du parent, qui la multiplie (et la retourne
-    // automatiquement quand le sprite est tourné vers la gauche).
+    // The offset is in world units; the local transform is divided by the
+    // parent's scale, which multiplies it (and automatically flips it when
+    // the sprite faces left).
     let local_offset = config.hitbox_offset / config.sprite_scale.max(f32::EPSILON);
 
     let mut hitbox = commands.spawn((

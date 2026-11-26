@@ -2,67 +2,68 @@
 
 [![Crates.io](https://img.shields.io/crates/v/ai-duel.svg)](https://crates.io/crates/ai-duel)
 [![docs.rs](https://img.shields.io/docsrs/ai-duel)](https://docs.rs/ai-duel)
-[![License: GPL v2+](https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20or%20Apache--2.0-blue.svg)](https://opensource.org/licenses/MIT)
 [![Bevy 0.20](https://img.shields.io/badge/bevy-0.19-orange.svg)](https://bevyengine.org)
 
-Plugin [Bevy](https://bevyengine.org) pour monter rapidement un duel joueur
-contre IA : santé, factions, hitbox d'attaque et une IA basique qui fonce sur
-le joueur et frappe quand elle est à portée.
+A [Bevy](https://bevyengine.org) plugin for quickly setting up a player vs. AI
+duel: health, factions, attack hitboxes, and a basic AI that rushes toward the
+player and strikes when in range.
 
-Né d'un prototype personnel, isolé dans une crate séparée car réutilisé d'un
-projet à l'autre.
+Originally part of a personal prototype, it was extracted into a separate crate
+for reuse across projects.
 
-## Sommaire
+## Contents
 
-- [Fonctionnalités](#fonctionnalités)
-- [Limites](#limites)
+- [Features](#features)
+- [Limitations](#limitations)
 - [Installation](#installation)
-- [Démarrage rapide](#démarrage-rapide)
+- [Quick start](#quick-start)
 - [Configuration](#configuration)
-- [Contrôler le joueur](#contrôler-le-joueur)
-- [Débogage](#débogage)
+- [Controlling the player](#controlling-the-player)
+- [Debugging](#debugging)
 - [Architecture](#architecture)
-- [Choix de conception](#choix-de-conception)
+- [Design choices](#design-choices)
 - [Changelog](#changelog)
-- [Licence](#licence)
+- [License](#️-license)
+- [About](#-about)
 
-## Fonctionnalités
+## Features
 
-- **Combattants** : vie, faction (`Player` / `Enemy`), animation de course et
-  d'attaque.
-- **IA** (`AiController`) : avance vers le joueur, s'arrête à une distance
-  donnée, se tourne vers sa cible et attaque à portée.
-- **Hitbox / hurtbox** : la hitbox est active sur une fenêtre de frames
-  réglable, décalée devant le combattant et retournée avec le sprite. Une
-  touche exige un recouvrement AABB avec la hurtbox de la cible.
-- **Invulnérabilité** brève et flash rouge après chaque coup encaissé.
-- **Mort** : un combattant à 0 PV est supprimé avec sa hitbox.
-- **`AiDuelSet`** : ensemble de systèmes pour ordonner vos propres systèmes.
+- **Fighters**: health, faction (`Player` / `Enemy`), running and attack
+  animations.
+- **AI** (`AiController`): moves toward the player, stops at a specified
+  distance, faces its target, and attacks in range.
+- **Hitbox / hurtbox**: the hitbox is active during a configurable frame
+  window, offset in front of the fighter and flipped with the sprite. A hit
+  requires AABB overlap with the target's hurtbox.
+- Brief **invulnerability** and a red flash after each hit.
+- **Death**: a fighter at 0 HP is removed along with its hitbox.
+- **`AiDuelSet`**: a system set for ordering your own systems.
 
-## Limites
+## Limitations
 
-- **Pas de chargement d'assets** : `FighterAssets` est construite par
-  l'utilisateur avec ses propres spritesheets.
-- **Pas d'input clavier** : à vous d'appeler `start_attack()` et de déplacer
-  le `Transform` du joueur (voir [Contrôler le joueur](#contrôler-le-joueur)).
-- **Pas d'animation d'idle ni de mort, pas de pathfinding** : l'IA va en ligne
-  droite vers le joueur.
-- **Collisions en O(n)** : pas de structure d'accélération. Largement
-  suffisant pour un duel ou quelques ennemis, pas pour une horde.
-- **Une seule hitbox par combattant**, créée au spawn.
-- **Un seul joueur** : `ai_behavior` utilise `Query::single` ; avec plusieurs
-  entités `Player`, l'IA ne fait rien.
-- **Pas de réseau**, tout est local.
+- **No asset loading**: the user constructs `FighterAssets` with their own
+  spritesheets.
+- **No keyboard input**: you must call `start_attack()` and move the player's
+  `Transform` yourself (see [Controlling the player](#controlling-the-player)).
+- **No idle or death animation, no pathfinding**: the AI moves in a straight
+  line toward the player.
+- **O(n) collisions**: no acceleration structure. More than enough for a duel
+  or a few enemies, but not for a horde.
+- **One hitbox per fighter**, created on spawn.
+- **One player only**: `ai_behavior` uses `Query::single`; with multiple
+  `Player` entities, the AI does nothing.
+- **No networking**: everything is local.
 
 ## Installation
 
 ```toml
 [dependencies]
-ai-duel = "0.2"
+ai-duel = "0.3"
 bevy = "0.20"
 ```
 
-## Démarrage rapide
+## Quick start
 
 ```rust
 use bevy::prelude::*;
@@ -93,11 +94,11 @@ fn setup(
             UVec2::new(96, 80), 6, 1, None, None)),
     };
 
-    // le joueur, à gauche
+    // the player, on the left
     spawn_fighter(&mut commands, &assets, &config,
         Vec3::new(-250.0, 0.0, 0.0), Faction::Player, None);
 
-    // un ennemi piloté par l'IA, à droite
+    // an AI-controlled enemy, on the right
     spawn_fighter(&mut commands, &assets, &config,
         Vec3::new(250.0, 0.0, 0.0), Faction::Enemy,
         Some(AiController {
@@ -110,18 +111,17 @@ fn setup(
 }
 ```
 
-Les spritesheets sont attendues sous forme d'une seule ligne de frames (course
-et attaque dans deux images séparées). Adaptez `TextureAtlasLayout` pour un
-autre format.
+Spritesheets are expected to contain a single row of frames (running and
+attacking in separate images). Adjust `TextureAtlasLayout` for other formats.
 
-> **Portée de l'IA.** Avec la config par défaut, une attaque touche jusqu'à
-> environ 100 unités (décalage 45 + demi-hitbox 35 + demi-hurtbox 20).
-> Gardez `aggression_range` en dessous, sinon l'IA frappe dans le vide.
+> **AI range.** With the default config, an attack can hit up to approximately
+> 100 units away (offset 45 + hitbox half-size 35 + hurtbox half-size 20).
+> Keep `aggression_range` below that, or the AI will strike at empty space.
 
 ## Configuration
 
-Tous les réglages sont dans `AiDuelConfig`. Le plugin insère une config par
-défaut ; remplacez-la après avoir ajouté le plugin :
+All settings are in `AiDuelConfig`. The plugin inserts a default config;
+replace it after adding the plugin:
 
 ```rust
 App::new()
@@ -134,26 +134,26 @@ App::new()
     .run();
 ```
 
-| Champ                                 | Défaut        | Rôle                                         |
-|---------------------------------------|---------------|----------------------------------------------|
-| `attack_damage`                       | `10.0`        | Dégâts par coup                              |
-| `attack_cooldown`                     | `0.60`        | Délai minimal entre deux attaques (s)        |
-| `hit_cooldown`                        | `0.40`        | Invulnérabilité après un coup (s)            |
-| `hitbox_active_from` / `_to`          | `2` / `4`     | Frames où la hitbox est active               |
-| `hitbox_half_size`                    | `(35, 30)`    | Demi-taille de la hitbox                     |
-| `hitbox_offset`                       | `(45, 0)`     | Décalage devant le combattant                |
-| `hurtbox_half_size`                   | `(20, 35)`    | Demi-taille de la zone vulnérable            |
-| `debug_hitboxes`                      | `false`       | Affiche les hitbox                           |
-| `default_max_health`                  | `100.0`       | PV de départ                                 |
-| `sprite_scale`                        | `1.5`         | Échelle des sprites                          |
+| Field                                | Default       | Purpose                                      |
+|--------------------------------------|---------------|----------------------------------------------|
+| `attack_damage`                      | `10.0`        | Damage per hit                               |
+| `attack_cooldown`                    | `0.60`        | Minimum delay between attacks (s)            |
+| `hit_cooldown`                       | `0.40`        | Invulnerability after a hit (s)              |
+| `hitbox_active_from` / `_to`         | `2` / `4`     | Frames in which the hitbox is active         |
+| `hitbox_half_size`                   | `(35, 30)`    | Hitbox half-size                             |
+| `hitbox_offset`                      | `(45, 0)`     | Offset in front of the fighter               |
+| `hurtbox_half_size`                  | `(20, 35)`    | Vulnerable area half-size                    |
+| `debug_hitboxes`                     | `false`       | Displays hitboxes                            |
+| `default_max_health`                 | `100.0`       | Starting HP                                  |
+| `sprite_scale`                       | `1.5`         | Sprite scale                                 |
 
-Les distances sont en unités monde. Voir la documentation de `AiDuelConfig`
-pour la liste complète.
+Distances are in world units. See the `AiDuelConfig` documentation for the
+complete list.
 
-## Contrôler le joueur
+## Controlling the player
 
-Le plugin ne touche pas au `Transform` du joueur. Planifiez votre système
-`.before(AiDuelSet)` pour que l'attaque soit prise en compte dès la même frame :
+The plugin does not change the player's `Transform`. Schedule your system
+`.before(AiDuelSet)` so the attack is processed in the same frame:
 
 ```rust
 fn player_input(
@@ -176,7 +176,7 @@ fn player_input(
         return;
     }
 
-    // pas de déplacement pendant l'attaque
+    // no movement during an attack
     if state.0 == FighterState::Attacking {
         wants.0 = false;
         return;
@@ -188,20 +188,20 @@ fn player_input(
 
     wants.0 = dir != Vec2::ZERO;
     if dir.x != 0.0 {
-        // retourne le sprite (et donc la hitbox) selon la direction
+        // flip the sprite (and therefore the hitbox) according to direction
         tf.scale.x = config.sprite_scale * dir.x.signum();
     }
     tf.translation += (dir.normalize_or_zero() * 200.0 * time.delta_secs()).extend(0.0);
 }
 
-// dans main() :
+// in main():
 // .add_systems(Update, player_input.before(AiDuelSet))
 ```
 
-## Débogage
+## Debugging
 
-Activez `debug_hitboxes: true` dans `AiDuelConfig` pour afficher les hitbox en
-rouge translucide. Les touches et les morts sont tracées au niveau `debug`
+Set `debug_hitboxes: true` in `AiDuelConfig` to display hitboxes in translucent
+red. Hits and deaths are logged at the `debug` level
 (`RUST_LOG=ai_duel=debug`).
 
 ## Architecture
@@ -209,32 +209,43 @@ rouge translucide. Les touches et les morts sont tracées au niveau `debug`
 ```
 src/
 ├── lib.rs          plugin, AiDuelSet, spawn_fighter, start_attack, prelude
-├── components.rs   AiDuelConfig, FighterAssets, composants (Health, Hitbox...)
-└── systems.rs      systèmes du plugin (IA, animation, collisions, mort)
+├── components.rs   AiDuelConfig, FighterAssets, components (Health, Hitbox...)
+└── systems.rs      plugin systems (AI, animation, collisions, death)
 ```
 
-L'ordre d'exécution est : cooldowns → IA → animation → hitbox → collisions →
-santé/flash → mort.
+The execution order is: cooldowns → AI → animation → hitbox → collisions →
+health/flash → death.
 
-## Choix de conception
+## Design choices
 
-- **États figés (`Running` / `Attacking`)** plutôt qu'une machine à états
-  générique : un duel n'a besoin que de deux états.
-- **Hitbox en entité enfant** : le `GlobalTransform` hérité du parent suit la
-  position et le retournement du combattant sans calcul manuel.
-- **Fenêtre de frames actives** plutôt qu'une hitbox active pendant toute
-  l'attaque : le coup ne fait pas mal avant que le bras ait bougé.
-- **Hitbox + hurtbox (AABB)** plutôt qu'un test point-dans-boîte : la portée
-  réelle d'une attaque dépend de la taille des deux zones.
-- **Systèmes chaînés (`.chain()`)** : chaque étape dépend du résultat de la
-  précédente ; les paralléliser créerait des incohérences d'une frame à l'autre.
-- **Systèmes publics** : ils peuvent être remplacés ou ré-ordonnés depuis
-  l'application hôte sans forker la crate.
+- **Fixed states (`Running` / `Attacking`)** rather than a generic state
+  machine: a duel only needs two states.
+- **Hitbox as a child entity**: the inherited `GlobalTransform` follows the
+  fighter's position and flip without manual calculations.
+- **Active frame window** rather than a hitbox active throughout the attack:
+  the strike does not deal damage before the arm moves.
+- **Hitbox + hurtbox (AABB)** rather than a point-in-box test: the actual
+  attack range depends on the size of both areas.
+- **Chained systems (`.chain()`)**: each step depends on the result of the
+  previous one; running them in parallel would cause frame-to-frame
+  inconsistencies.
+- **Public systems**: they can be replaced or reordered by the host
+  application without forking the crate.
 
 ## Changelog
 
-Voir [CHANGELOG.md](CHANGELOG.md).
+See [CHANGELOG.md](CHANGELOG.md).
 
-## Licence
+## 🛡️ License
 
-GPL-2.0-or-later, voir le champ `license` de `Cargo.toml`.
+Licensed under either of:
+
+    MIT license (http://opensource.org/licenses/MIT)
+
+    Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
+
+at your option.
+
+## 🦅 About
+
+Developed by Jorge Andre Castro.

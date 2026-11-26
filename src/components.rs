@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026 Jorge Andre Castro <georgeandrec@gmail.com>
 
-//! Ressources, composants et configuration du plugin.
+//! Resources, components, and configuration for the plugin.
 
 use bevy::prelude::*;
 
@@ -9,11 +9,11 @@ use bevy::prelude::*;
 // Configuration
 // ---------------------------------------------------------------------------
 
-/// Tous les réglages du duel au même endroit (cooldowns, dégâts, vitesse
-/// d'animation, hitbox...).
+/// All duel settings in one place (cooldowns, damage, animation speed,
+/// hitboxes...).
 ///
-/// Le plugin insère une copie par défaut ; pour modifier un réglage,
-/// insérez la vôtre juste après avoir ajouté le plugin :
+/// The plugin inserts a default copy; to change a setting, insert your own
+/// just after adding the plugin:
 ///
 /// ```no_run
 /// # use bevy::prelude::*;
@@ -30,46 +30,45 @@ use bevy::prelude::*;
 /// # }
 /// ```
 ///
-/// Les distances sont exprimées en **unités monde** (donc après application
-/// de [`sprite_scale`](Self::sprite_scale)).
+/// Distances are expressed in **world units** (after applying
+/// [`sprite_scale`](Self::sprite_scale)).
 #[derive(Resource, Clone, Debug)]
 pub struct AiDuelConfig {
-    /// Nombre de frames de l'animation de course.
+    /// Number of frames in the running animation.
     pub run_frames: usize,
-    /// Durée d'une frame de course, en secondes.
+    /// Duration of a running frame, in seconds.
     pub run_frame_time: f32,
 
-    /// Nombre de frames de l'animation d'attaque.
+    /// Number of frames in the attack animation.
     pub attack_frames: usize,
-    /// Durée d'une frame d'attaque, en secondes.
+    /// Duration of an attack frame, in seconds.
     pub attack_frame_time: f32,
 
-    /// Temps minimal entre deux attaques d'un même combattant (secondes).
+    /// Minimum time between attacks by the same fighter (seconds).
     pub attack_cooldown: f32,
-    /// Durée d'invulnérabilité après un coup encaissé (secondes), pour
-    /// éviter d'être touché plusieurs fois par la même attaque.
+    /// Invulnerability duration after a hit (seconds), to prevent being hit
+    /// multiple times by the same attack.
     pub hit_cooldown: f32,
-    /// Dégâts infligés par une attaque.
+    /// Damage dealt by an attack.
     pub attack_damage: f32,
 
-    /// Première frame de l'animation d'attaque où la hitbox est active.
+    /// First attack animation frame in which the hitbox is active.
     pub hitbox_active_from: usize,
-    /// Dernière frame (incluse) où la hitbox est active.
+    /// Last frame (inclusive) in which the hitbox is active.
     pub hitbox_active_to: usize,
-    /// Demi-taille de la hitbox d'attaque (AABB).
+    /// Half-size of the attack hitbox (AABB).
     pub hitbox_half_size: Vec2,
-    /// Décalage de la hitbox par rapport au centre du combattant, pour un
-    /// combattant tourné vers la droite. Le décalage en X est
-    /// automatiquement inversé quand le sprite est retourné.
+    /// Hitbox offset from the fighter's center when facing right. The X offset
+    /// is automatically reversed when the sprite is flipped.
     pub hitbox_offset: Vec2,
-    /// Demi-taille de la zone où un combattant peut être touché (AABB).
+    /// Half-size of the area where a fighter can be hit (AABB).
     pub hurtbox_half_size: Vec2,
-    /// Affiche les hitbox à l'écran (débogage).
+    /// Displays hitboxes on screen (debugging).
     pub debug_hitboxes: bool,
 
-    /// Points de vie d'un combattant à sa création.
+    /// A fighter's health points at creation.
     pub default_max_health: f32,
-    /// Échelle appliquée aux sprites des combattants.
+    /// Scale applied to fighter sprites.
     pub sprite_scale: f32,
 }
 
@@ -99,67 +98,65 @@ impl Default for AiDuelConfig {
 // Assets
 // ---------------------------------------------------------------------------
 
-/// Les spritesheets (course et attaque), partagées par tous les combattants.
+/// The spritesheets (running and attacking), shared by all fighters.
 ///
-/// Chaque entité référence les mêmes handles : aucune copie par combattant.
-/// Cette ressource doit être insérée par l'application hôte.
+/// Every entity references the same handles: no copy per fighter.
+/// This resource must be inserted by the host application.
 #[derive(Resource, Clone, Debug)]
 pub struct FighterAssets {
-    /// Image de l'animation de course.
+    /// Running animation image.
     pub run_sheet: Handle<Image>,
-    /// Découpage de l'animation de course.
+    /// Running animation atlas layout.
     pub run_layout: Handle<TextureAtlasLayout>,
-    /// Image de l'animation d'attaque.
+    /// Attack animation image.
     pub attack_sheet: Handle<Image>,
-    /// Découpage de l'animation d'attaque.
+    /// Attack animation atlas layout.
     pub attack_layout: Handle<TextureAtlasLayout>,
 }
 
 // ---------------------------------------------------------------------------
-// Composants
+// Components
 // ---------------------------------------------------------------------------
 
-/// Marque le combattant du joueur.
+/// Marks the player's fighter.
 ///
-/// Utilisé par l'IA pour trouver sa cible, et pratique pour brancher votre
-/// propre système d'input.
+/// Used by the AI to find its target and convenient for connecting your own
+/// input system.
 #[derive(Component, Debug)]
 pub struct Player;
 
-/// Le camp d'un combattant. Deux entités de la même faction ne se blessent
-/// jamais entre elles.
+/// A fighter's faction. Two entities in the same faction never hurt each other.
 #[derive(Component, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Faction {
-    /// Camp du joueur.
+    /// The player's faction.
     Player,
-    /// Camp des ennemis.
+    /// The enemies' faction.
     Enemy,
 }
 
-/// Points de vie d'un combattant, avec une fenêtre d'invulnérabilité après
-/// chaque coup encaissé.
+/// A fighter's health points, with an invulnerability window after each hit.
 #[derive(Component, Debug)]
 pub struct Health {
-    /// Points de vie actuels.
+    /// Current health points.
     pub current: f32,
-    /// Points de vie maximum.
+    /// Maximum health points.
     pub max: f32,
-    /// Temps restant avant de pouvoir encaisser un nouveau coup (secondes).
+    /// Time remaining before another hit can be taken (seconds).
     pub hit_cooldown: f32,
 }
 
 impl Health {
-    /// Crée une santé pleine.
+    /// Creates full health.
     pub fn full(max: f32) -> Self {
         Self { current: max, max, hit_cooldown: 0.0 }
     }
 
-    /// `true` si le combattant n'a plus de points de vie.
+    /// `true` if the fighter has no health points left.
     pub fn is_dead(&self) -> bool {
         self.current <= 0.0
     }
 
-    /// Fraction de vie restante, entre 0.0 et 1.0 (utile pour une barre de vie).
+    /// Remaining health fraction, between 0.0 and 1.0 (useful for a health bar).
     pub fn fraction(&self) -> f32 {
         if self.max <= 0.0 {
             0.0
@@ -168,8 +165,8 @@ impl Health {
         }
     }
 
-    /// Tente d'encaisser un coup. Retourne `true` si les dégâts ont été
-    /// appliqués, `false` si le combattant est mort ou invulnérable.
+    /// Attempts to take a hit. Returns `true` if damage was applied, or
+    /// `false` if the fighter is dead or invulnerable.
     pub fn try_hit(&mut self, damage: f32, invulnerability: f32) -> bool {
         if self.is_dead() || self.hit_cooldown > 0.0 {
             return false;
@@ -180,45 +177,44 @@ impl Health {
     }
 }
 
-/// Temps restant avant la prochaine attaque possible (secondes).
+/// Time remaining until the next possible attack (seconds).
 #[derive(Component, Debug)]
 pub struct AttackCooldown(pub f32);
 
-/// Zone vulnérable d'un combattant (AABB centrée sur son `GlobalTransform`).
+/// A fighter's vulnerable area (AABB centered on its `GlobalTransform`).
 #[derive(Component, Debug)]
 pub struct Hurtbox {
-    /// Demi-taille de la zone, en unités monde.
+    /// Half-size of the area, in world units.
     pub half_size: Vec2,
 }
 
-/// Zone qui inflige des dégâts.
+/// An area that deals damage.
 ///
-/// Spawnée en enfant du combattant pour suivre sa position (et son
-/// retournement) via le `GlobalTransform`. Elle n'est active que sur quelques
-/// frames de l'animation d'attaque.
+/// Spawned as a child of the fighter to follow its position (and flip) via
+/// `GlobalTransform`. It is only active during a few attack animation frames.
 #[derive(Component, Debug)]
 pub struct Hitbox {
-    /// L'entité qui possède cette hitbox (celle qui frappe).
+    /// The entity that owns this hitbox (the attacker).
     pub owner: Entity,
-    /// Faction du propriétaire : les cibles de même faction sont ignorées.
+    /// Owner's faction: targets in the same faction are ignored.
     pub faction: Faction,
-    /// Demi-taille de la hitbox, en unités monde.
+    /// Half-size of the hitbox, in world units.
     pub half_size: Vec2,
-    /// Dégâts infligés en cas de touche.
+    /// Damage dealt on a hit.
     pub damage: f32,
-    /// `true` uniquement pendant la fenêtre de frames actives.
+    /// `true` only during the active frame window.
     pub active: bool,
 }
 
-/// Comportement de l'IA : avance vers le joueur, s'arrête à distance et
-/// attaque quand elle est assez proche. Volontairement basique.
+/// AI behavior: moves toward the player, stops at a distance, and attacks
+/// when close enough. Intentionally basic.
 #[derive(Component, Clone, Debug)]
 pub struct AiController {
-    /// En dessous de cette distance, l'IA lance une attaque.
+    /// Below this distance, the AI launches an attack.
     pub aggression_range: f32,
-    /// En dessous de cette distance, l'IA arrête d'avancer.
+    /// Below this distance, the AI stops moving forward.
     pub stop_range: f32,
-    /// Vitesse de déplacement (unités monde par seconde).
+    /// Movement speed (world units per second).
     pub speed: f32,
 }
 
@@ -228,32 +224,32 @@ impl Default for AiController {
     }
 }
 
-/// Indique si le combattant se déplace cette frame ; l'animation s'en sert
-/// pour choisir entre course et pose fixe.
+/// Indicates whether the fighter is moving this frame; the animation uses it
+/// to choose between running and a stationary pose.
 #[derive(Component, Debug)]
 pub struct WantsToMove(pub bool);
 
-/// État d'animation d'un combattant.
+/// A fighter's animation state.
 #[derive(Component, Debug)]
 pub struct AnimationTimer {
-    /// Timer de changement de frame.
+    /// Frame change timer.
     pub timer: Timer,
-    /// Frame courante dans l'animation en cours.
+    /// Current frame in the active animation.
     pub frame_index: usize,
-    /// Nombre de frames de l'animation en cours.
+    /// Number of frames in the active animation.
     pub max_frames: usize,
 }
 
-/// Les états possibles d'un combattant.
+/// The possible states of a fighter.
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum FighterState {
-    /// Course / déplacement (ou pose fixe).
+    /// Running / moving (or stationary pose).
     Running,
-    /// Attaque en cours (non interruptible).
+    /// Attack in progress (cannot be interrupted).
     Attacking,
 }
 
-/// État courant d'un combattant.
+/// A fighter's current state.
 #[derive(Component, Debug)]
 pub struct CurrentState(pub FighterState);
 
@@ -274,7 +270,7 @@ mod tests {
         let mut hp = Health::full(100.0);
         assert!(hp.try_hit(30.0, 0.4));
         assert_eq!(hp.current, 70.0);
-        // encore invulnérable
+        // still invulnerable
         assert!(!hp.try_hit(30.0, 0.4));
         assert_eq!(hp.current, 70.0);
     }

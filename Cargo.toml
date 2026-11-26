@@ -1,10 +1,10 @@
 [package]
 name          = "ai-duel"
-version       = "0.2.0"
+version       = "0.3.0"
 edition       = "2024"
 authors       = ["Jorge Andre Castro <georgeandrec@gmail.com>"]
 license       = "GPL-2.0-or-later"
-description   = "Plugin d'IA de duel (approche + attaque + dégâts) pour Bevy."
+description   = "Duel AI plugin (approach, attack, and damage) for Bevy."
 repository    = "https://github.com/jorgeandrecastro/ai-duel"
 documentation = "https://docs.rs/ai-duel"
 readme        = "README.md"
